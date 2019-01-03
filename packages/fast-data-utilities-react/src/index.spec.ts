@@ -3,10 +3,13 @@ import { get } from "lodash-es";
 import {
     ChildOptionItem,
     getDataLocationsOfChildren,
+    getDataLocationsOfPlugins,
     mapDataToComponent,
     mapSchemaLocationFromDataLocation,
+    PluginLocation,
 } from "./";
 
+import ChildrenWithRenderProp from "./__tests__/components/children-plugin";
 import Children from "./__tests__/components/children";
 import General from "./__tests__/components/general-example";
 import TextField from "./__tests__/components/text-field";
@@ -16,7 +19,11 @@ import * as arraysSchema from "./__tests__/schemas/arrays.schema.json";
 import * as generalSchema from "./__tests__/schemas/general-example.schema.json";
 import * as anyOfSchema from "./__tests__/schemas/any-of.schema.json";
 import * as childrenSchema from "./__tests__/schemas/children.schema.json";
+import * as childrenWithRenderPropsSchema from "./__tests__/schemas/children-plugin.schema.json";
 import * as textFieldSchema from "./__tests__/schemas/text-field.schema.json";
+import MapChildrenPropToCallbackPassingClassName from "./__tests__/plugins/map-children-prop-to-callback-passing-class-name";
+import MapBooleanPropToString from "./__tests__/plugins/map-boolean-prop-to-string";
+import MapArrayPropToObject from "./__tests__/plugins/map-array-prop-to-object";
 
 /**
  * Map schema location from data location
@@ -128,6 +135,220 @@ describe("mapSchemaLocationFromDataLocation", () => {
 
         expect(schemaLocationComponent).toBe("reactProperties.children");
         expect(schemaLocationString).toBe("reactProperties.children");
+    });
+});
+
+describe("getDataLocationsOfPlugins", () => {
+    const childOptions: ChildOptionItem[] = [
+        {
+            component: Children,
+            schema: childrenSchema,
+        },
+        {
+            component: ChildrenWithRenderProp,
+            schema: childrenWithRenderPropsSchema,
+        },
+        {
+            component: TextField,
+            schema: textFieldSchema,
+        },
+    ];
+
+    test("should return the data location of a single react child mapped to a plugin", () => {
+        const data: any = {
+            children: {
+                id: childrenSchema.id,
+                props: {},
+            },
+        };
+
+        const dataLocationsOfPlugins: PluginLocation[] = getDataLocationsOfPlugins(
+            childrenWithRenderPropsSchema,
+            data,
+            childOptions
+        );
+
+        expect(dataLocationsOfPlugins.length).toBe(1);
+        expect(dataLocationsOfPlugins[0].dataLocation).toBe("children");
+    });
+    test("should return the data location of a nested react child mapped to a plugin", () => {
+        const data: any = {
+            children: {
+                id: childrenSchema.id,
+                props: {
+                    children: {
+                        id: childrenSchema.id,
+                        props: {
+                            children: {
+                                id: childrenWithRenderPropsSchema.id,
+                                props: {
+                                    children: {
+                                        id: childrenSchema.id,
+                                        props: {},
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        };
+
+        const dataLocationsOfPlugins: PluginLocation[] = getDataLocationsOfPlugins(
+            childrenSchema,
+            data,
+            childOptions
+        );
+
+        expect(dataLocationsOfPlugins.length).toBe(1);
+        expect(dataLocationsOfPlugins[0].dataLocation).toBe(
+            "children.props.children.props.children.props.children"
+        );
+    });
+    test("should return the data locations of multiple children mapped to a plugin", () => {
+        const data: any = {
+            children: {
+                id: childrenWithRenderPropsSchema.id,
+                props: {
+                    children: {
+                        id: childrenSchema.id,
+                        props: {},
+                    },
+                },
+            },
+            restrictedWithChildren: {
+                id: childrenWithRenderPropsSchema.id,
+                props: {
+                    children: {
+                        id: childrenSchema.id,
+                        props: {},
+                    },
+                },
+            },
+        };
+
+        const dataLocationsOfPlugins: PluginLocation[] = getDataLocationsOfPlugins(
+            childrenSchema,
+            data,
+            childOptions
+        );
+
+        expect(dataLocationsOfPlugins.length).toBe(2);
+        expect(dataLocationsOfPlugins[0].dataLocation).toBe("children.props.children");
+        expect(dataLocationsOfPlugins[1].dataLocation).toBe(
+            "restrictedWithChildren.props.children"
+        );
+    });
+    test("should return data locations of nested react child with multiple children mapped to a plugin", () => {
+        const data: any = {
+            children: {
+                id: childrenSchema.id,
+                props: {
+                    children: {
+                        id: childrenSchema.id,
+                        props: {
+                            children: {
+                                id: childrenWithRenderPropsSchema.id,
+                                props: {
+                                    children: {
+                                        id: childrenSchema.id,
+                                        props: {},
+                                    },
+                                },
+                            },
+                            restrictedWithChildren: {
+                                id: childrenWithRenderPropsSchema.id,
+                                props: {
+                                    children: {
+                                        id: childrenSchema.id,
+                                        props: {},
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        };
+
+        const dataLocationsOfPlugins: PluginLocation[] = getDataLocationsOfPlugins(
+            childrenSchema,
+            data,
+            childOptions
+        );
+
+        expect(dataLocationsOfPlugins.length).toBe(2);
+        expect(dataLocationsOfPlugins[0].dataLocation).toBe(
+            "children.props.children.props.children.props.children"
+        );
+        expect(dataLocationsOfPlugins[1].dataLocation).toBe(
+            "children.props.children.props.restrictedWithChildren.props.children"
+        );
+    });
+    test("should return data locations of an array of nested react children with multiple children mapped to a plugin", () => {
+        const data: any = {
+            children: {
+                id: childrenWithRenderPropsSchema.id,
+                props: {
+                    children: [
+                        {
+                            id: childrenSchema.id,
+                            props: {
+                                children: "foo",
+                            },
+                        },
+                        {
+                            id: childrenSchema.id,
+                            props: {
+                                children: "bar",
+                            },
+                        },
+                    ],
+                },
+            },
+            restrictedWithChildren: {
+                id: childrenWithRenderPropsSchema.id,
+                props: {
+                    children: {
+                        id: childrenSchema.id,
+                        props: {
+                            children: "bat",
+                        },
+                    },
+                },
+            },
+        };
+
+        const dataLocationsOfPlugins: PluginLocation[] = getDataLocationsOfPlugins(
+            childrenSchema,
+            data,
+            childOptions
+        );
+
+        expect(dataLocationsOfPlugins).toHaveLength(2);
+        expect(dataLocationsOfPlugins[0].dataLocation).toBe("children.props.children");
+        expect(dataLocationsOfPlugins[1].dataLocation).toBe(
+            "restrictedWithChildren.props.children"
+        );
+    });
+    test("should return data locations of an array of items mapped to a plugin", () => {
+        const data: any = {
+            children: {
+                id: childrenWithRenderPropsSchema.id,
+                props: {
+                    array: ["foo", "bar"],
+                },
+            },
+        };
+
+        const dataLocationsOfPlugins: PluginLocation[] = getDataLocationsOfPlugins(
+            childrenSchema,
+            data,
+            childOptions
+        );
+
+        expect(dataLocationsOfPlugins).toHaveLength(1);
+        expect(dataLocationsOfPlugins[0].dataLocation).toBe("children.props.array");
     });
 });
 
@@ -315,9 +536,16 @@ describe("getDataLocationsOfChildren", () => {
 });
 
 describe("mapDataToComponent", () => {
+    const childrenPluginResolverId: string =
+        childrenWithRenderPropsSchema.reactProperties.children.pluginResolverId;
+    const arrayPluginResolverId: string =
+        childrenWithRenderPropsSchema.properties.array.pluginResolverId;
+    const booleanPluginResolverId: string =
+        childrenWithRenderPropsSchema.properties.boolean.pluginResolverId;
     const childOptions: ChildOptionItem[] = [
         { component: Children, schema: childrenSchema },
         { component: TextField, schema: textFieldSchema },
+        { component: ChildrenWithRenderProp, schema: childrenWithRenderPropsSchema },
     ];
 
     test("should map data to a child", () => {
@@ -393,5 +621,43 @@ describe("mapDataToComponent", () => {
         );
         expect(typeof get(mappedData, "children[1].type")).toBe("function");
         expect(get(mappedData, "children[1].type.displayName")).toBe("Text field");
+    });
+    test("should map data to a plugin", () => {
+        const data: any = {
+            children: [
+                {
+                    id: textFieldSchema.id,
+                    props: {},
+                },
+            ],
+            boolean: true,
+            array: ["foo", "bar", "bat"],
+        };
+        const testClass: string = "Hello world";
+        const mappedData: any = mapDataToComponent(
+            childrenWithRenderPropsSchema,
+            data,
+            childOptions,
+            [
+                new MapChildrenPropToCallbackPassingClassName({
+                    pluginResolverId: childrenPluginResolverId,
+                }),
+                new MapBooleanPropToString({
+                    pluginResolverId: [booleanPluginResolverId],
+                }),
+                new MapArrayPropToObject({
+                    pluginResolverId: arrayPluginResolverId,
+                }),
+            ]
+        );
+
+        expect(typeof mappedData.boolean).toBe("string");
+        expect(typeof mappedData.array).toBe("object");
+        expect(mappedData.array["foo"]).toEqual(0);
+        expect(mappedData.array["bar"]).toEqual(1);
+        expect(mappedData.array["bat"]).toEqual(2);
+        expect(typeof mappedData.children).toBe("function");
+        expect(mappedData.children).toHaveLength(1);
+        expect(mappedData.children(testClass).props.className).toBe(testClass);
     });
 });
